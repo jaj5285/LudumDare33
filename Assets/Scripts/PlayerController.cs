@@ -7,20 +7,46 @@ public class PlayerController : MonoBehaviour {
 	private Transform myTransform;
 	private Rigidbody myRigidBody;
 	private Renderer renderer;
-	
+	private bool isDoubleJump;
+
+	// Player Stats
 	public float playerSpeed = 3.0f;
 	public float playerHealth = 10.0f;
-	public float jumpHeight = 5.0f;
-	public float distToGround = 0.5f; // this needs to be changed if object is a different height (do obj height/2)
+	public float jumpHeight = 15.0f;
+	public float doubleJumpHeight = 16.0f;
 
+	// Player PoweUps
+	public bool hasFirePower = true;
+	public bool hasDoubleJumpPower = true;
+	public bool hasMagnetPower = true;
+	public float playerMoney = 0.0f;
+
+	// Helper variables
+	public float downwardForce = -1f; // gravity so jumps are not float-y
+	public float myHeight; // used to calculate distance to ground for raycast isGrounded
+
+	// External Objects
+	public GameObject flamethrowerObj;
+	public GameObject magnetObj;
 	public Text healthText;
-	
+	public Text collectableText;
+
+	// Buttons
+	public KeyCode FIRE_BTN = KeyCode.V;
+
+
+
 	// Use this for initialization
 	void Start () {
 		myTransform = transform;
 		myRigidBody = GetComponent<Rigidbody> ();
 		renderer = this.gameObject.GetComponent<Renderer> ();
+		isDoubleJump = false;
 		
+		flamethrowerObj.SetActive(false);
+		magnetObj.SetActive (false);
+
+		myHeight = renderer.bounds.size.y;
 		healthText.text = "Health: " + playerHealth;
 	}
 	
@@ -28,19 +54,52 @@ public class PlayerController : MonoBehaviour {
 	void Update () {
 		// Move 
 		myTransform.Translate (Vector3.right * playerSpeed * Input.GetAxis("Horizontal") * Time.deltaTime);
-	}
 
-	// Similar to Update, but for logic using Physics
-	void FixedUpdate () {
 		// Jump
-		if ( (Input.GetKeyDown(KeyCode.Space) && IsGrounded()) || (Input.GetKeyDown(KeyCode.UpArrow) && IsGrounded()) ) {
-			Vector3 height = new Vector3(0, jumpHeight, 0);
-			myRigidBody.velocity = height;
+		if ( Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W) ) {
+			// Regular jump
+			if ( IsGrounded() ) {	
+				Jump(jumpHeight);
+			} 
+			else // Double jump
+			{
+				if (!isDoubleJump && hasDoubleJumpPower) 
+				{
+					isDoubleJump = true;
+					Jump(doubleJumpHeight);
+				}
+			}
+		}
+
+		if (IsGrounded ()) {
+			isDoubleJump = false;
+		} 
+		else {
+			// Downward gravity
+			Vector3 gravity = new Vector3 (0, downwardForce, 0);
+			myRigidBody.velocity += gravity;
+		}
+
+		// Fire Attack
+		if (Input.GetKey (FIRE_BTN) && hasFirePower) {
+			flamethrowerObj.SetActive(true);
+		} else if (Input.GetKeyUp (FIRE_BTN)) {
+			flamethrowerObj.SetActive(false);
+		}
+
+		// Magnet
+		if (hasMagnetPower && !magnetObj.activeSelf) {
+			magnetObj.SetActive(true);
 		}
 	}
 
+	void Jump (float height) {		
+		Vector3 myJump = new Vector3(0, height, 0);
+		myRigidBody.velocity = myJump;
+	}
+
 	bool IsGrounded() {
-		return Physics.Raycast(myTransform.position, -Vector3.up, distToGround);
+		return Physics.Raycast(myTransform.position, -Vector3.up, (myHeight/2 + 0.05f));
 	}
 		
 	IEnumerator ColorFlash(float time, float intervalTime, Color flashColor)
@@ -61,7 +120,7 @@ public class PlayerController : MonoBehaviour {
 	void OnCollisionEnter (Collision col) {
 		//collide with Enemy
 		if (col.gameObject.CompareTag ("Enemy")) {
-			EnemyController enemyObj = col.gameObject.GetComponent<EnemyController>();
+			EnemyController enemyObj = col.gameObject.GetComponent<EnemyController> ();
 			
 			// damage player
 			playerHealth -= enemyObj.damageGiven;
@@ -74,8 +133,21 @@ public class PlayerController : MonoBehaviour {
 			
 			// Calculate if player is dead
 			if (playerHealth <= 0) {
-				Destroy(this.gameObject);
+				Destroy (this.gameObject);
 			}
+		}
+		//Collectables
+		if (col.gameObject.CompareTag ("Collectable")) {
+			CollectableController CC = col.gameObject.GetComponent<CollectableController>();
+
+			// Add money
+			playerMoney += CC.myValue;
+
+			// Update text box
+			collectableText.text = "$ " + playerMoney;
+
+			// Destroy collectable
+			Destroy(col.gameObject);
 		}
 	}
 	

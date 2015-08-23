@@ -8,6 +8,8 @@ TagManager:
   - Checkpoint
   - Goal
   - Projectile
+  - Collectable
+  - Attack_Fire
   layers:
   - Default
   - TransparentFX
